@@ -7,6 +7,7 @@ from PIL import Image
 
 BATCH_SIZE = 8
 BETA = 0.01
+h, w = 256, 256
 
 class Model:
 	
@@ -19,17 +20,17 @@ class Model:
 		self.var_gen = make_dict(10, 32, 'g', 1, 1)
 		
 		# Define target image
-		self.img_ans = tf.placeholder(tf.float32, [None, 513, 513])
+		self.img_ans = tf.placeholder(tf.float32, [None, h, w])
 		
 		# Define graph for C(C-G graph)
-		self.img_C_input = tf.placeholder(tf.float32, [None, 513, 513])
+		self.img_C_input = tf.placeholder(tf.float32, [None, h, w])
 		self.img_C_com = self.com_net(self.img_C_input, self.var_com['weights'], self.var_com['biases'])
 		self.img_C_gen = self.gen_net(self.img_C_com, self.var_gen['weights'], self.var_gen['biases'])
 		self.img_C_final = self.img_C_com + self.img_C_gen
 		self.C_loss = tf.reduce_mean(tf.square(self.img_ans - self.img_C_final))
 		
 		# Define graph for G(G graph)
-		self.img_G_input = tf.placeholder(tf.float32, [None, 513, 513])
+		self.img_G_input = tf.placeholder(tf.float32, [None, h, w])
 		self.img_G_gen = self.gen_net(self.img_G_input, self.var_gen['weights'], self.var_gen['biases'])
 		self.img_G_final = self.img_G_input + self.img_G_gen
 		self.G_loss = tf.reduce_mean(tf.square(self.img_ans - self.img_G_final))
@@ -47,30 +48,30 @@ class Model:
 		self.saver = tf.train.Saver(tf.global_variables())
 				
 	def com_net(self, x, weights, biases):
-		x = tf.reshape(x, [-1, 513, 513, 1])
-		x = conv2d(x, weights['wc1'], biases['bc1'], act_func = 'LReLU', use_bn = False)
+		x = tf.reshape(x, [-1, h, w, 1])
+		x = conv2d(x, weights['wc1'], biases['bc1'], act_func = 'ReLU', use_bn = False)
 		for i in range(2, 2):
 			name_w = 'wc'+str(i)
 			name_b = 'bc'+str(i)
-			x = conv2d(x, weights[name_w], biases[name_b], act_func = 'LReLU')   
+			x = conv2d(x, weights[name_w], biases[name_b], act_func = 'ReLU')   
 		res = conv2d(x, weights['wcx'], biases['bcx'], act_func='Sigmoid', use_bn = False)
-		res = tf.reshape(res, [-1, 513, 513])
+		res = tf.reshape(res, [-1, h, w])
 		return res
 
 	def gen_net(self, x, weights, biases):
-		x = tf.reshape(x, [-1, 513, 513, 1])
-		x = conv2d(x, weights['wc1'], biases['bc1'], act_func = 'LReLU', use_bn = False) 
+		x = tf.reshape(x, [-1, h, w, 1])
+		x = conv2d(x, weights['wc1'], biases['bc1'], act_func = 'ReLU', use_bn = False) 
 		for i in range(1, 6//2):
 			x_input = x
 			name_w = 'wc'+str(2*i)
 			name_b = 'bc'+str(2*i)
-			x_input = conv2d(x_input, weights[name_w], biases[name_b], act_func='LReLU')
+			x_input = conv2d(x_input, weights[name_w], biases[name_b], act_func='ReLU')
 			name_w = 'wc'+str(2*i+1)
 			name_b = 'bc'+str(2*i+1)
 			x_input = conv2d(x_input, weights[name_w], biases[name_b], act_func='None')
 			x = leaky_relu(x_input + x)
 		res = conv2d(x, weights['wcx'], biases['bcx'], act_func='TanH', use_bn = False)
-		res = tf.reshape(res, [-1, 513, 513])
+		res = tf.reshape(res, [-1, h, w])
 		return res
 
 	def get_G_input(self, img, qf = 100):
@@ -79,7 +80,8 @@ class Model:
 		batch_size = img_C.shape[0]
 		for i in range(batch_size):
 			img = img_C[i]
-			print("img : ", img.min(), img.max())
+			#img = np.clip(img, 0, 1)
+			#print("img : ", img.min(), img.max())
 			img = (img * 255.).astype(np.uint8)
 			img = Image.fromarray(img, 'L')
 			img.save('temp.jpeg', quality = qf)
