@@ -3,6 +3,7 @@ import numpy as np
 import random
 import tensorflow.contrib.slim as slim
 from lib import *
+from PIL import Image
 
 BATCH_SIZE = 8
 BETA = 0.01
@@ -71,19 +72,37 @@ class Model:
 		res = conv2d(x, weights['wcx'], biases['bcx'], act_func='TanH', use_bn = False)
 		res = tf.reshape(res, [-1, 513, 513])
 		return res
-	
+
+	def get_G_input(self, img, qf = 100):
+		res = []
+		img_C = self.sess.run(self.img_C_com, feed_dict = {self.img_C_input: img})
+		batch_size = img_C.shape[0]
+		for i in range(batch_size):
+			img = img_C[i]
+			print("img : ", img.min(), img.max())
+			img = (img * 255.).astype(np.uint8)
+			img = Image.fromarray(img, 'L')
+			img.save('temp.jpeg', quality = qf)
+			img_jpeg = Image.open('temp.jpeg')
+			img_jpeg = np.array(img_jpeg)
+			print("jpeg : ", img_jpeg.min(), img_jpeg.max())
+			img_jpeg = img_jpeg / 255.
+			res.append(img_jpeg)
+		res = np.array(res)
+		return res
+
 	def train(self):
 		# Create batch
 		data = []
 		for _ in range(BATCH_SIZE):
 			pos = random.randrange(0, len(self.trainData))
 			data.append(self.trainData[pos])
-
+		
 		# Train C
 		_, C_loss = self.sess.run([self.C_opt, self.C_loss], feed_dict = {self.img_C_input: data, self.img_ans: data})
 		
 		# Train G
-		img_G_input = self.sess.run(self.img_C_com, feed_dict = {self.img_C_input: data})
+		img_G_input = self.get_G_input(data, qf = 80)
 		_, G_loss = self.sess.run([self.G_opt, self.G_loss], feed_dict = {self.img_G_input: img_G_input, self.img_ans: data})
 		return C_loss, G_loss
 
@@ -94,7 +113,7 @@ class Model:
 		_, C_loss = self.sess.run([self.C_opt, self.C_loss], feed_dict = {self.img_C_input: data, self.img_ans: data})
 		
 		# Test G
-		img_G_input = self.sess.run(self.img_C_com, feed_dict = {self.img_C_input: data})
+		img_G_input = self.get_G_input(data, qf = 80)
 		_, G_loss = self.sess.run([self.G_opt, self.G_loss], feed_dict = {self.img_G_input: img_G_input, self.img_ans: data})
 		return C_loss, G_loss
 

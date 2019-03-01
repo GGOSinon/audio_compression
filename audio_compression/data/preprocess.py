@@ -17,7 +17,7 @@ def getSTFT(wavfile, n_fft, n_hop):
 	for i in range(k):
 		for j in range(m):
 			A[i][j] = amplitude_to_db(abs(stft_data[i][j]))
-	A = np.transpose(normalize(A))
+	A = np.transpose(A)
 	return A
 
 import os
@@ -46,7 +46,11 @@ for i in range(file_num):
 	for k in range(num_dataset):
 		if k % 10 == 0: print("File %d: %d" % (i, k))
 		pos = random.randrange(0, len_music - data_size)
-		dataset.append(stft[pos : pos + data_size])
+		data = stft[pos : pos + data_size]
+		data = normalize(data)
+		#print(data.min(), data.max())
+		dataset.append(data)
+		
 
 dataset = np.array(dataset)
 print(dataset.shape)
